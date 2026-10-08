@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>مخطط المذاكرة</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;700&display=swap">
+<style>
+:root{--bg:#F2F5FA;--card:#fff;--ink:#14213D;--mut:#5B6785;--line:#DCE2EE;--acc:#2F5BEA;--accT:#fff;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0E1424;--card:#172038;--ink:#E8EDF9;--mut:#97A3C4;--line:#2A3556;--acc:#7C9BFF;--accT:#0E1424}}
+:root[data-theme="dark"]{--bg:#0E1424;--card:#172038;--ink:#E8EDF9;--mut:#97A3C4;--line:#2A3556;--acc:#7C9BFF;--accT:#0E1424}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"IBM Plex Sans Arabic",system-ui,sans-serif;line-height:1.6}
+main{max-width:760px;margin:0 auto;padding:20px 16px 48px}
+h1{font-size:1.7rem;margin:8px 0 4px}
+p.sub{color:var(--mut);margin:0 0 20px}
+section{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:16px}
+h2{font-size:1.05rem;margin:0 0 12px}
+label{font-size:.85rem;color:var(--mut);display:block}
+input,select,button{font:inherit;color:inherit}
+input,select{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
+input:focus-visible,select:focus-visible,button:focus-visible,a:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.row{display:grid;grid-template-columns:2fr 1.4fr 1fr auto;gap:8px;align-items:end;margin-bottom:10px}
+.days{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.days input{padding:8px 4px;text-align:center}
+.days label{text-align:center;font-size:.75rem}
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+button{cursor:pointer;border-radius:8px;border:1px solid var(--line);background:var(--card);padding:8px 12px}
+button.pri{background:var(--acc);color:var(--accT);border-color:var(--acc);font-weight:700;padding:12px;width:100%;margin-top:6px}
+button.x{padding:8px 10px;color:var(--mut)}
+.sum{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.chip{border-radius:999px;padding:3px 12px;font-size:.85rem;color:#fff;font-weight:500}
+.day{border-top:1px solid var(--line);padding:12px 0}
+.day:first-of-type{border-top:0}
+.day h3{margin:0 0 6px;font-size:.95rem}
+.exam{color:#C2410C;font-weight:700}
+.slot{display:flex;align-items:center;gap:10px;padding:6px 0}
+.bar{width:5px;align-self:stretch;border-radius:3px}
+.slot time{color:var(--mut);font-size:.85rem;min-width:110px;direction:ltr;text-align:right}
+.slot a{margin-inline-start:auto;color:var(--acc);font-size:.85rem;text-decoration:none;white-space:nowrap}
+.warn{background:#FEF3C7;color:#78350F;border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:.9rem}
+.acts{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.acts button{flex:1;min-width:140px}
+.hint{color:var(--mut);font-size:.82rem;margin:6px 0 0}
+@media(max-width:520px){.row{grid-template-columns:1fr 1fr}.row .nm{grid-column:1/-1}}
+</style>
+</head>
+<body>
+<main>
+<h1>مخطط المذاكرة</h1>
+<p class="sub">أضيفي موادك وتواريخ امتحاناتك وساعات فراغك، ويوزّع لك المذاكرة تلقائياً.</p>
+
+<section><h2>المواد</h2><div id="subs"></div><button id="add">+ إضافة مادة</button></section>
+
+<section><h2>ساعات الفراغ في كل يوم</h2><div class="days" id="days"></div>
+<div class="opts">
+<div><label for="start">بداية المذاكرة (الساعة)</label><input id="start" type="number" min="0" max="23" value="16"></div>
+<div><label for="len">مدة الجلسة (دقيقة)</label><select id="len"><option>30</option><option>45</option><option selected>60</option><option>90</option></select></div>
+</div></section>
+
+<button class="pri" id="gen">ولّدي الجدول</button>
+<div id="out" style="margin-top:16px"></div>
+</main>
+
+<script>
+const COLORS=["#2F5BEA","#0F9D8A","#C2410C","#8B5CF6","#BE185D","#4D7C0F"];
+const DN=["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"];
+const ORDER=[6,0,1,2,3,4,5]; // السبت أولاً
+const $=id=>document.getElementById(id);
+const pad=n=>String(n).padStart(2,"0");
+const ds=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const parse=s=>{const[y,m,d]=s.split("-").map(Number);return new Date(y,m-1,d)};
+const fmtDay=d=>d.toLocaleDateString("ar-u-nu-latn",{weekday:"long",day:"numeric",month:"long"});
+const addDays=(d,n)=>{const x=new Date(d);x.setDate(x.getDate()+n);return x};
+let sched=[];
+
+function subRow(name="",date="",diff=2){
+  const i=$("subs").children.length;
+  const r=document.createElement("div");r.className="row";
+  r.innerHTML=`<div class="nm"><label>المادة</label><input class="n" value="${name}" placeholder="مثال: هياكل البيانات"></div>
+  <div><label>تاريخ الامتحان</label><input class="d" type="date" value="${date}"></div>
+  <div><label>الصعوبة</label><select class="f"><option value="1">سهلة</option><option value="2">متوسطة</option><option value="3">صعبة</option></select></div>
+  <button class="x" aria-label="حذف المادة">✕</button>`;
+  r.querySelector(".f").value=diff;
+  r.querySelector(".x").onclick=()=>r.remove();
+  $("subs").appendChild(r);
+}
+const today=new Date();today.setHours(0,0,0,0);
+subRow("هياكل البيانات",ds(addDays(today,9)),3);
+subRow("قواعد البيانات",ds(addDays(today,13)),2);
+subRow("شبكات الحاسب",ds(addDays(today,18)),2);
+$("add").onclick=()=>subRow();
+ORDER.forEach(g=>{const w=document.createElement("div");
+  w.innerHTML=`<label for="h${g}">${DN[g]}</label><input id="h${g}" type="number" min="0" max="12" step="0.5" value="${g===5?1:3}">`;
+  $("days").appendChild(w)});
+
+function generate(){
+  const subs=[...$("subs").children].map((r,i)=>({name:r.querySelector(".n").value.trim(),
+    exam:r.querySelector(".d").value,diff:+r.querySelector(".f").value,color:COLORS[i%COLORS.length],got:0}))
+    .filter(s=>s.name&&s.exam&&parse(s.exam)>today);
+  if(!subs.length){$("out").innerHTML='<div class="warn">أضيفي مادة واحدة على الأقل بتاريخ امتحان قادم.</div>';return}
+  const len=+$("len").value,start=+$("start").value;
+  const last=new Date(Math.max(...subs.map(s=>parse(s.exam))));
+  sched=[];
+  for(let d=new Date(today);d<=last;d=addDays(d,1)){
+    const slots=Math.floor((+$("h"+d.getDay()).value||0)*60/len);
+    const day={date:new Date(d),exams:subs.filter(s=>s.exam===ds(d)),items:[]};
+    let prev=null;
+    for(let k=0;k<slots;k++){
+      const open=subs.filter(s=>parse(s.exam)>d);
+      if(!open.length)break;
+      // الأولوية: الصعوبة × قرب الامتحان ÷ ما أخذته المادة من جلسات
+      let best=null,bs=-1;
+      for(const s of open){
+        const left=Math.round((parse(s.exam)-d)/864e5);
+        let sc=s.diff*(1+4/left)/(1+s.got);
+        if(s===prev)sc*=.6;
+        if(sc>bs){bs=sc;best=s}
+      }
+      const m=start*60+k*(len+10);
+      day.items.push({s:best,from:m,to:m+len});
+      best.got++;prev=best;
+    }
+    sched.push(day);
+  }
+  render(subs,len);
+}
+const hm=m=>`${pad(Math.floor(m/60)%24)}:${pad(m%60)}`;
+const stamp=(d,m)=>`${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}T${pad(Math.floor(m/60)%24)}${pad(m%60)}00`;
+
+function render(subs,len){
+  let h="";
+  const weak=subs.filter(s=>s.got<s.diff*2);
+  if(weak.length)h+=`<div class="warn">وقتك ضيق لمادة: ${weak.map(s=>s.name).join("، ")}. زيدي ساعات الفراغ أو غيّري مدة الجلسة.</div>`;
+  h+=`<section><h2>ملخص الجلسات</h2><div class="sum">${subs.map(s=>`<span class="chip" style="background:${s.color}">${s.name}: ${s.got} جلسة</span>`).join("")}</div>
+  <div class="acts"><button id="cp">نسخ ملف التقويم (.ics)</button></div>
+  <p class="hint">لتصديرها دفعة وحدة: انسخي النص، احفظيه كملف باسم plan.ics، ثم في Google Calendar: الإعدادات ← استيراد وتصدير ← استيراد. أو أضيفي كل جلسة لحالها من رابط «أضيفي» جنبها.</p></section><section>`;
+  sched.forEach(day=>{
+    if(!day.items.length&&!day.exams.length)return;
+    h+=`<div class="day"><h3>${fmtDay(day.date)}${day.exams.map(e=>` <span class="exam">· امتحان ${e.name}</span>`).join("")}</h3>`;
+    day.items.forEach(it=>{
+      const u=`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent("مذاكرة: "+it.s.name)}&dates=${stamp(day.date,it.from)}/${stamp(day.date,it.to)}`;
+      h+=`<div class="slot"><span class="bar" style="background:${it.s.color}"></span><time>${hm(it.from)}–${hm(it.to)}</time><span>${it.s.name}</span><a href="${u}" target="_blank" rel="noopener">أضيفي</a></div>`;
+    });
+    h+=`</div>`;
+  });
+  $("out").innerHTML=h+`</section>`;
+  $("cp").onclick=async()=>{
+    const ics=toICS();
+    try{await navigator.clipboard.writeText(ics);$("cp").textContent="تم النسخ ✓"}
+    catch(e){const t=document.createElement("textarea");t.value=ics;t.style.width="100%";t.style.height="140px";$("cp").after(t);t.select();$("cp").textContent="حددي النص وانسخيه"}
+  };
+}
+function toICS(){
+  const L=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//StudyPlanner//AR//EN"];
+  sched.forEach((day,di)=>day.items.forEach((it,k)=>{
+    L.push("BEGIN:VEVENT",`UID:sp-${di}-${k}-${Date.now()}@studyplanner`,`DTSTAMP:${stamp(new Date(),new Date().getHours()*60+new Date().getMinutes())}`,
+      `DTSTART:${stamp(day.date,it.from)}`,`DTEND:${stamp(day.date,it.to)}`,`SUMMARY:مذاكرة: ${it.s.name}`,"END:VEVENT");
+  }));
+  L.push("END:VCALENDAR");return L.join("\r\n");
+}
+$("gen").onclick=generate;
+generate();
+</script>
+</body>
+</html>
