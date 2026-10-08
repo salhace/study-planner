@@ -1,0 +1,8 @@
+{
+  "name": "study-planner-server",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": { "start": "node index.js", "dev": "node --watch index.js", "test": "jest" },
+  "dependencies": { "dotenv": "^16.4.5", "express": "^4.19.2", "express-session": "^1.18.0", "googleapis": "^144.0.0" },
+  "devDependencies": { "jest": "^29.7.0" }
+}
